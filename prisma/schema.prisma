@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum GameMode {
+  CLASSIC
+}
+
+enum PrivacyRoom {
+  PUBLIC
+  PRIVATE
+}
+
+model rooms {
+  id                  String      @id @default(uuid()) @map("_id")
+  name                String
+  password            String?
+  privacyRoom         PrivacyRoom @default(PUBLIC) @map("privacy_room")
+  gameMode            GameMode    @default(CLASSIC) @map("game_mode")
+  maxPlayersCount     Int         @default(2) @map("max_players_count")
+  currentPlayersCount Int         @map("current_players_count")
+}
