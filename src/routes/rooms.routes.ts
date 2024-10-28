@@ -1,19 +1,16 @@
 import { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma";
-import { z, ZodError } from "zod";
+import { z } from "zod";
 
 const CreateRoomSchema = z.object({
   name: z
     .string({ message: "O nome da sala é obrigatório" })
     .min(1, { message: "Precisa ter pelo menos 1 caracter" })
     .max(20, { message: "Precisa ter pelo menos de 20 caracteres" }),
-  password: z.string().optional(),
+  password: z.string().optional().nullable(),
   privacyRoom: z.enum(["PUBLIC", "PRIVATE"], {
     message: "A propriedade 'privacyRoom' precisa ser 'PUBLIC' ou 'PRIVATE'",
   }),
-  gameMode: z.enum(["CLASSIC"]),
-  maxPlayersCount: z.number(),
-  currentPlayersCount: z.number(),
 });
 
 type CreateRouteType = z.infer<typeof CreateRoomSchema>;
@@ -25,7 +22,7 @@ export async function rooms(app: FastifyInstance) {
 
       res.send({ message: "Sucesso ao buscar salas!", data: response });
     } catch (error: any) {
-      res.send({
+      res.status(500).send({
         message: "Erro inesperado ao buscar salas!",
         error: error.message,
       });
@@ -34,8 +31,7 @@ export async function rooms(app: FastifyInstance) {
   });
 
   app.post("/create", async (req, res) => {
-    let { name, password, privacyRoom, gameMode, maxPlayersCount } =
-      req.body as CreateRouteType;
+    const { name, password, privacyRoom } = req.body as CreateRouteType;
 
     try {
       CreateRoomSchema.parse(req.body);
@@ -43,11 +39,8 @@ export async function rooms(app: FastifyInstance) {
       const response = await prisma.rooms.create({
         data: {
           name: name,
-          password: password,
-          privacyRoom: privacyRoom || "PUBLIC",
-          gameMode: gameMode || "CLASSIC",
-          maxPlayersCount: maxPlayersCount,
-          currentPlayersCount: 0,
+          password: privacyRoom === "PRIVATE" ? password : "",
+          privacyRoom: privacyRoom,
         },
       });
 
@@ -55,14 +48,16 @@ export async function rooms(app: FastifyInstance) {
         message: "Sala criada com sucesso!",
         data: response,
       });
-    } catch (error: ZodError | any) {
-      if (error instanceof ZodError) {
-        res.send({ message: error.message });
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        res.status(400).send({ message: error.errors[0].message });
       }
 
-      res.send({ message: "Erro inesperado ao criar sala!", error: error });
+      res
+        .status(500)
+        .send({ message: "Erro inesperado ao criar sala!", error: error });
 
-      console.error(error.message);
+      console.error(error);
     }
   });
 }

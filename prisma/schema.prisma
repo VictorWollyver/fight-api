@@ -23,5 +23,5 @@ model rooms {
   privacyRoom         PrivacyRoom @default(PUBLIC) @map("privacy_room")
   gameMode            GameMode    @default(CLASSIC) @map("game_mode")
   maxPlayersCount     Int         @default(2) @map("max_players_count")
-  currentPlayersCount Int         @map("current_players_count")
+  currentPlayersCount Int         @default(1) @map("current_players_count")
 }
