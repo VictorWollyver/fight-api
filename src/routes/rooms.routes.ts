@@ -36,6 +36,10 @@ export async function rooms(app: FastifyInstance) {
     try {
       CreateRoomSchema.parse(req.body);
 
+      if (privacyRoom === "PRIVATE" && !password) {
+        throw new Error("É necessário informar a senha!");
+      }
+
       const response = await prisma.rooms.create({
         data: {
           name: name,
@@ -51,6 +55,12 @@ export async function rooms(app: FastifyInstance) {
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         res.status(400).send({ message: error.errors[0].message });
+      }
+
+      if (error instanceof Error) {
+        res.status(400).send({
+          message: error.message,
+        });
       }
 
       res
