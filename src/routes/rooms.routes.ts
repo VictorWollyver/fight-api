@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
+import { ok } from "assert";
 
 const CreateRoomSchema = z.object({
 	name: z.string({ message: "O nome da sala é obrigatório" }).min(1, { message: "Precisa ter pelo menos 1 caracter" }).max(20, { message: "Precisa ter pelo menos de 20 caracteres" }),
@@ -15,7 +16,13 @@ type CreateRouteType = z.infer<typeof CreateRoomSchema>;
 export async function rooms(app: FastifyInstance) {
 	app.get("/", async (req, res) => {
 		try {
-			const response = await prisma.rooms.findMany();
+			const response = await prisma.rooms.findMany({
+				where: {
+					currentPlayersCount: {
+						lt: 2,
+					},
+				},
+			});
 
 			res.send({ message: "Sucesso ao buscar salas!", data: response });
 		} catch (error: any) {
@@ -77,6 +84,70 @@ export async function rooms(app: FastifyInstance) {
 				data: response,
 			});
 		} catch (error: unknown) {
+			res.status(500).send({ message: "Erro inesperado ao criar sala!", error: error });
+		}
+	});
+
+	app.post("/joinRoomById/:id", async (req, res) => {
+		const { id } = req.params as { id: string };
+		console.log(id);
+
+		try {
+			const response = await prisma.rooms.findUnique({ where: { id: id } });
+
+			if (!response) {
+				throw new Error("Sala não encontrada!");
+			}
+
+			if (response.currentPlayersCount === response.maxPlayersCount) {
+				throw new Error("Sala cheia!");
+			}
+
+			if (response.privacyRoom === "PUBLIC") {
+				await prisma.rooms.update({
+					where: { id: id },
+					data: {
+						currentPlayersCount: response.currentPlayersCount + 1,
+					},
+				});
+			}
+
+			if (response.privacyRoom === "PRIVATE") {
+				throw new Error("Sala privada!");
+			}
+
+			res.send({
+				message: "Juntou a sala com sucesso!",
+				data: response,
+			});
+		} catch (error: unknown) {
+			console.error(error);
+			res.status(500).send({ message: "Erro inesperado ao criar sala!", error: error });
+		}
+	});
+
+	app.post("/leaveRoomById/:id", async (req, res) => {
+		const { id } = req.params as { id: string };
+
+		try {
+			const response = await prisma.rooms.findUnique({ where: { id: id } });
+
+			if (!response) {
+				throw new Error("Sala não encontrada!");
+			}
+
+			await prisma.rooms.update({
+				where: { id: id },
+				data: {
+					currentPlayersCount: response.currentPlayersCount - 1,
+				},
+			});
+
+			res.send({
+				message: "Saiu da sala com sucesso!",
+			});
+		} catch (error: unknown) {
+			console.error(error);
 			res.status(500).send({ message: "Erro inesperado ao criar sala!", error: error });
 		}
 	});
